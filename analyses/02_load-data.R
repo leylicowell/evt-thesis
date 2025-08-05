@@ -35,7 +35,7 @@ colnames(data) <- ctry_codes
 #===============================================================================
 
 # log returns
-log_returns <-  apply(data, 2, FUN = function(x) diff(log(x))) #ndifflog
+log_returns <-  apply(data, 2, FUN = function(x) diff(log(x))) 
 
 d <-  dim(log_returns)[2]
 n <-  dim(log_returns)[1]
@@ -61,11 +61,15 @@ for (name in names(fit)) {
 }
 garch_returns <- as.data.frame(garch_returns)
 
-
+head(garch_returns)
 #===============================================================================
 # we choose to save our new data sets as a .csv to facilitate readability and to 
 # facilitate using this data set on different platforms/with different software
 #===============================================================================
+
+data <- data.frame(Date = as.Date(rownames(data)), data)
+log_returns <- data.frame(Date = as.Date(rownames(data)[2:nrow(data)]), log_returns)
+garch_returns <- data.frame(Date = as.Date(rownames(data)[2:nrow(data)]), garch_returns)
 
 write.csv(data, 
           file = file.path(here("data", "derived"), "currency-data.csv"), 

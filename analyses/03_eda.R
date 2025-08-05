@@ -19,9 +19,12 @@ library(kableExtra)
 # load data
 #===============================================================================
 
-data <- read.csv(here("data", "derived", "currency-data.csv"))
+currencies <- read.csv(here("data", "derived", "currency-data.csv"))
 
-data$date <- as.Date(data$date)
+currencies$Date <- as.Date(currencies$Date)
+
+log_returns <- read.csv(here("data", "derived", "log-returns.csv"))
+log_returns$Date <- as.Date(log_returns$Date)
 
 #===============================================================================
 # exploratory data analysis
@@ -31,46 +34,33 @@ data$date <- as.Date(data$date)
 # visualise exchange rate for each country
 #-------------------------------------------------------------------------------
 
-data_long <- pivot_longer(data, 
-                          cols = -date, 
+data_long <- pivot_longer(currencies, 
+                          cols = -Date, 
                           names_to = "Country", 
                           values_to = "Rate")
 
-data_long$date <- as.Date(data_long$date)
+data_long$Date <- as.Date(data_long$Date)
 
-ggplot(data_long, aes(x = date, y = Rate, group = 1)) +
+ggplot(data_long, aes(x = Date, y = Rate, group = 1)) +
   facet_wrap(~Country, scales = "free_y", ncol = 2) +
-  labs(title = "Exchange Rate to USD over Time",
+  labs(title = "Exchange Rate to GBP over Time",
        x = "Date", y = "Exchange Rate") +
   geom_line() +
   scale_x_date(date_breaks = "5 years", date_labels = "%Y")+
   theme_bw()
-
-# SAR pegged to the dollar since 1986
 
 
 #-------------------------------------------------------------------------------
 # calculate and visualise log returns
 #-------------------------------------------------------------------------------
 
-log_returns <- data %>%
-  mutate(across(-date, ~log(. / lag(.)), .names = "{.col}_logret")) %>%
-  drop_na()
-
-log_returns <- subset(log_returns, 
-                      select = c(date, 
-                                 SAR_logret, 
-                                 ILS_logret,
-                                 TRY_logret,
-                                 TND_logret))
-
 head(log_returns)
 
-logret_long <- pivot_longer(log_returns, cols = -date,
+logret_long <- pivot_longer(log_returns, cols = -Date,
                             names_to = "Country", values_to = "LogReturn") %>%
   mutate(Country = gsub("_logret", "", Country))
 
-ggplot(logret_long, aes(x = date, y = LogReturn, group = 1)) +
+ggplot(logret_long, aes(x = Date, y = LogReturn, group = 1)) +
   geom_line() +
   facet_wrap(~Country, scales = "free_y", ncol = 2) +
   labs(title = "Daily Log Returns of Exchange Rates",
@@ -81,9 +71,8 @@ ggplot(logret_long, aes(x = date, y = LogReturn, group = 1)) +
 #-------------------------------------------------------------------------------
 # summary of statistics
 #-------------------------------------------------------------------------------
-colnames(log_returns) <- gsub("_logret", "", colnames(log_returns))
 
-summary_stats <- subset(log_returns, select = -date) %>%
+summary_stats <- subset(log_returns, select = -Date) %>%
   pivot_longer(everything())%>%
   group_by(name) %>%
   summarise(mean = mean(value),
@@ -94,9 +83,6 @@ summary_stats <- subset(log_returns, select = -date) %>%
 summary_stats %>%
   kbl(caption = "Descriptive Statistics for Log Returns") %>%
   kable_styling(bootstrap_options = c("striped", "hover"))
-
-
-# nov. 2016, egypt devalued currency by 48% to meet IMF demands
 
 #-------------------------------------------------------------------------------
 # compare to a normal distribution
@@ -110,7 +96,7 @@ stats <- logret_long %>%
             min = min(LogReturn),
             max = max(LogReturn))
 
-normal_curves <- matrix(nrow = 4, ncol = 1000)
+normal_curves <- matrix(nrow = nrow(stats), ncol = 1000)
 
 for (i in 1:nrow(stats)){
   x <- seq(stats$min[i], stats$max[i], length.out = 1000)
@@ -119,7 +105,7 @@ for (i in 1:nrow(stats)){
 
 normal_df <- data.frame()
 
-for (i in 1:4) {
+for (i in 1:nrow(stats)) {
   df_temp <- data.frame(
     x = seq(stats$min[i], stats$max[i], length.out = 1000),
     y = normal_curves[i, ],
@@ -133,7 +119,7 @@ logret_long <- logret_long %>%
   mutate(Country = factor(Country))
 
 
-logret_only_long <- subset(logret_long, select =-date)
+logret_only_long <- subset(logret_long, select =-Date)
 str(logret_only_long$LogReturn)
 summary(logret_only_long)
 
@@ -163,18 +149,18 @@ ggplot(logret_long, aes(sample = scale(LogReturn))) +
 # ADF test
 #-------------------------------------------------------------------------------
 
-currencies <- colnames(subset(log_returns, select = -date))
+log_returns_only <- colnames(subset(log_returns, select = -Date))
 
 adf_results <- list()
 
-for (i in currencies) {
+for (i in log_returns_only) {
   # Run ADF test on log returns for each currency
   adf_test <- adf.test(log_returns[[i]], alternative = "stationary")
   adf_results[[i]] <- adf_test
 }
 
 adf_summary <- data.frame(
-  Currency = currencies,
+  Log_Returns = log_returns_only,
   Test_Statistic = sapply(adf_results, function(x) x$statistic),
   P_Value = sapply(adf_results, function(x) x$p.value),
   row.names = NULL)
@@ -190,21 +176,17 @@ adf_summary %>%
 #-------------------------------------------------------------------------------
 
 log_returns_squared <- log_returns %>%
-  mutate(across(-date, ~ .^2, .names = "{.col}_squared")) 
+  mutate(across(-Date, ~ .^2, .names = "{.col}_squared")) 
 
-log_returns_squared <- subset(log_returns_squared, 
-                              select = c(date,
-                                         SAR_squared,
-                                         ILS_squared,
-                                         TRY_squared,
-                                         TND_squared))
+log_returns_squared <- log_returns_squared %>%
+  select(Date, ends_with("_squared"))
 
-retsquared_long <- pivot_longer(log_returns_squared, cols = -date,
+retsquared_long <- pivot_longer(log_returns_squared, cols = -Date,
                             names_to = "Country", values_to = "LogReturnSquared") %>%
   mutate(Country = gsub("_squared", "", Country))
 
 # plot log returns squared
-ggplot(retsquared_long, aes(x = date, y = LogReturnSquared, group = 1)) +
+ggplot(retsquared_long, aes(x = Date, y = LogReturnSquared, group = 1)) +
   geom_line(color = "black") +
   labs(title = "Volatility Clustering: Squared Log Returns",
        y = "Squared Return") +
@@ -213,10 +195,10 @@ ggplot(retsquared_long, aes(x = date, y = LogReturnSquared, group = 1)) +
   theme_bw()
 
 # plot acf of log returns squared
-par(mfrow = c(2, 2))
+par(mfrow = c(3, 2))
 
 # plot ACF of standardised residuals
-for (country in names(subset(log_returns_squared, select = -date))) { 
+for (country in names(subset(log_returns_squared, select = -Date))) { 
   acf(log_returns_squared[[country]],
       main = paste(country))
 }
@@ -227,7 +209,7 @@ for (country in names(subset(log_returns_squared, select = -date))) {
 #-------------------------------------------------------------------------------
 
 right_tail_exceedances <- log_returns %>%
-  summarise(across(-date, ~sum(. > quantile(., probs = 0.95))))
+  summarise(across(-Date, ~sum(. > quantile(., probs = 0.95))))
 
 print(right_tail_exceedances)
 
@@ -236,22 +218,13 @@ logret_long <- logret_long %>%
   mutate(threshold_95 = quantile(LogReturn, 0.95),
          is_extreme = LogReturn > threshold_95)
 
-ggplot(logret_long, aes(x = date, y = LogReturn)) +
+ggplot(logret_long, aes(x = Date, y = LogReturn)) +
   geom_line(alpha = 0.6) +
   geom_point(data = subset(logret_long, is_extreme == TRUE),
-             aes(x = date, y = LogReturn), color = "red", size = 1) +
+             aes(x = Date, y = LogReturn), color = "red", size = 1) +
   facet_wrap(~Country, scales = "free_y", ncol = 2) +
   theme_bw() +
   labs(title = "Extreme Log Returns (Currency Depreciation Events)",
        y = "Log Return", x = "Date")
 
-
-#===============================================================================
-# we save our log returns data set as a .csv to facilitate readability and to 
-# facilitate using this data set on different platforms/with different software
-#===============================================================================
-
-write.csv(log_returns, 
-          file = file.path(here("data", "derived"), "log-returns-data.csv"), 
-          row.names = FALSE)
 
