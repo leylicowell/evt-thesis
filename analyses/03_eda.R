@@ -60,6 +60,8 @@ logret_long <- pivot_longer(log_returns, cols = -Date,
                             names_to = "Country", values_to = "LogReturn") %>%
   mutate(Country = gsub("_logret", "", Country))
 
+logret_long <- as.data.frame(logret_long)
+
 ggplot(logret_long, aes(x = Date, y = LogReturn, group = 1)) +
   geom_line() +
   facet_wrap(~Country, scales = "free_y", ncol = 2) +
@@ -115,7 +117,7 @@ for (i in 1:nrow(stats)) {
 }
 
 logret_long <- logret_long %>%
-  filter(!is.na(LogReturn), is.finite(LogReturn)) %>%  # remove any bad values
+  filter(!is.na(LogReturn)) %>%
   mutate(Country = factor(Country))
 
 
@@ -226,5 +228,6 @@ ggplot(logret_long, aes(x = Date, y = LogReturn)) +
   theme_bw() +
   labs(title = "Extreme Log Returns (Currency Depreciation Events)",
        y = "Log Return", x = "Date")
+
 
 

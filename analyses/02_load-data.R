@@ -30,20 +30,30 @@ data <- as.matrix(pdfetch_BOE(identifiers = c("XUDLERS",
 ctry_codes <- c("EUR","DNK", "CZE","HUN","POL","SWE", "NOR")
 colnames(data) <- ctry_codes
 
+data <- as.data.frame(data)
+
+#-------------------------------------------------------------------------------
+# replace NA values with last traded exchange rate
+#-------------------------------------------------------------------------------
+
+data <- data %>%
+  fill(everything(), .direction = "down")
+
 #===============================================================================
 # calculate log returns and extract garch residuals
 #===============================================================================
 
 # log returns
 log_returns <-  apply(data, 2, FUN = function(x) diff(log(x))) 
+log_returns <- as.data.frame(log_returns)
 
 d <-  dim(log_returns)[2]
 n <-  dim(log_returns)[1]
 
 # garch residuals
 spec <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1,1)),
-                   mean.model = list(armaOrder = c(0,2), include.mean = TRUE),
-                   distribution.model = "norm")
+                   mean.model = list(armaOrder = c(1,2), include.mean = TRUE),
+                   distribution.model = "std")
 
 
 fit <- lapply(as.data.frame(log_returns), function(x) {
@@ -59,9 +69,12 @@ for (name in names(fit)) {
   std_residuals <- residuals(fit[[name]], standardize = TRUE)
   garch_returns[[name]] <- as.numeric(std_residuals)
 }
+
+
 garch_returns <- as.data.frame(garch_returns)
 
 head(garch_returns)
+
 #===============================================================================
 # we choose to save our new data sets as a .csv to facilitate readability and to 
 # facilitate using this data set on different platforms/with different software
