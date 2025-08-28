@@ -1,6 +1,7 @@
 # In this script we run our pruning structure learning algorithms in the 
 # the extremes and very the learned structure fits our data 
-# for this analysis, we choose to generate an SCM data set 
+# for our initial analysis we choose to generate an HR-SCM dataset where
+# our HR-based pruning algorithm should give us a close to perfect fit
 
 #===============================================================================
 # load packages and functions
@@ -27,66 +28,89 @@ library(Rgraphviz)
 source(here("analyses","01_load_packages.R"))
 
 #===============================================================================
-# simulate SCM
+# simulate HR-SCM
 #===============================================================================
 
-set.seed(42)
-d <- 4
-tau <- 0.975
-alpha = 0.05
-nodes <- c("A", "B", "C", "D")
-n <- 10000
-Sigma <- diag(c(1, 3, 1, 2))
+set.seed(123)
+tau <- 0.9
 
-# define true extreme DAG
-B <- rbind(
-  c(0, 1, 1, 0),
-  c(0, 0, 0, 1),
-  c(0, 0, 0, 0),
+b2 <- 0.4
+b3 <- 0.6
+n <- 1000
+B <- matrix(0, 4, 4)
+B[1, 2] <- 1
+B[1, 3] <- 1
+B[2, 4] <- b2
+B[3, 4] <- b3
+
+d <- nrow(B)
+
+L <- matrix(0, 3, 4)
+L[1, 1] <- -1
+L[1,2] <- 1
+L[2,1] <- -1
+L[2,3] <- 1
+L[3, 2] <- -b2
+L[3, 3] <- -b3
+L[3,4] <- 1
+
+nu2 <- c(0.5, 0.7, 0.4)
+D_eps <- diag(nu2)
+
+# precision matrix 
+Theta <- t(L) %*% solve(D_eps) %*% L
+Gamma <- Theta2Gamma(Theta)
+mu_eps <- -0.5 * L %*% Gamma[,1]
+# simulate Gaussian noise
+eps <- mvrnorm(n, mu = as.numeric(mu_eps), Sigma = D_eps)
+
+R <- rexp(n)
+root <- 1
+d <- ncol(B)
+Y <- matrix(0, n, d)
+Y[, root] <- R
+Y[,2] <- B[1,2] * Y[,1] + eps[,1]
+Y[,3] <- B[1,3] * Y[,1] + eps[,2]
+Y[,4] <- B[2,4] * Y[,2] + B[3,4] * Y[,3] + eps[,3]
+
+Y_mp <- data2mpareto(Y, p = tau)
+
+Gamma_hat <- emp_vario(Y_mp)
+Gamma_hat
+Gamma
+
+
+#-------------------------------------------------------------------------------
+# assume a fully-connected DAG based on causal order (1,2,3,4)
+#-------------------------------------------------------------------------------
+
+full_dag <- rbind(
+  c(0, 1, 1, 1),  
+  c(0, 0, 1, 1),  
+  c(0, 0, 0, 1),  
   c(0, 0, 0, 0)
 )
 
 
-B_0_w <- B
-B_0 <- B
-B_resit <- B
-B_resit[3, 4] <- 1
+k <- nrow(Y_mp)
+alpha <- 0.05
 
-Y <- sample_SCM(n = n,
-                B_full = B_resit, 
-                B_0 = B_0, 
-                B_0_w = B_0_w, 
-                Sigma = Sigma)
-
-prunbl_prs <- prunable_pairs(B_resit) %>%
-  arrange(desc(y)) %>% transpose()
-
-  
-Y_mp <- graphicalExtremes::data2mpareto(Y, p = tau)
-  
-# estimate variogram and HR CI-test
-Gamma_hat <- emp_vario(Y_mp)
-ci_test_ext <- function(x, y, S, ...) {
-  HR_CItest(x, y, S, suffStat = list(Gamma = Gamma_hat, n = nrow(Y_mp)), ...)
+ci_test <- function(x, y, S, ...) {
+  HR_CItest(x, y, S, suffStat = list(Gamma = Gamma_hat, n = k), ...)
 }
-  
-# estimate extremal DAG via pruning
+
+prunbl_prs <- prunable_pairs(full_dag) %>% transpose()
+
 B_pruned <- prune_edge_algo(
-  B_full = B_resit,
+  B_full = full_dag,
   prunbl_prs = prunbl_prs,
-  ci_test = ci_test_ext,
+  ci_test = ci_test,
   alpha = alpha,
-  base_pruning_algo = purrr::partial(prune_edge_fast, verbose = FALSE),
-  separating_set_selector = mb_selector,
-  shuffle = TRUE
+  base_pruning_algo = prune_edge_fast,
+  separating_set_selector = mb_selector
 )
-  
-colnames(B_pruned) <- nodes
-rownames(B_pruned) <- nodes
 
 B_pruned
-
-
 
 #-------------------------------------------------------------------------------
 #  train DAG algorithm and verify inferred CIs hold on test data
@@ -110,10 +134,10 @@ ci_test_train <- function(x, y, S, ...) {
   HR_CItest(x, y, S, suffStat = list(Gamma = Gamma_train, n = k_train), ...)
 }
 
-prunbl_prs_train <- prunable_pairs(B_resit) %>% transpose()
+prunbl_prs_train <- prunable_pairs(full_dag) %>% transpose()
 
 B_pruned_train <- prune_edge_algo(
-  B_full = B_resit,
+  B_full = full_dag,
   prunbl_prs = prunbl_prs_train,
   ci_test = ci_test_train,
   alpha = alpha,
@@ -132,22 +156,11 @@ ci_test_test <- purrr::partial(
 
 res_test <- perform_citests(
   B_pruned_train,
-  ci_test_fun = ci_test_test
+  ci_test_fun <- function(x, y, S, ...) {
+    HR_CItest(x, y, S, suffStat = list(Gamma = Gamma_test, n = k_test), ...)
+  }
 )
-
 res_test
-
-# summarise results
-alpha <- 0.05
-res_summary <- res_test %>%
-  mutate(reject = pvalue < alpha) %>%
-  group_by(is_dsep) %>%
-  summarise(
-    n_tests = n(),
-    prop_reject = mean(reject),
-    .groups = "drop"
-  )
-res_summary
 
 # summarise results
 alpha <- 0.05
@@ -163,7 +176,7 @@ res_summary
 
 
 #===============================================================================
-# compute conditional probabilities from inferred DAG
+# compute conditional probabilities from extremal DAG
 #===============================================================================
 
 retrieve_parents <- function(dag){
@@ -186,6 +199,7 @@ retrieve_parents <- function(dag){
   return(parents_list)
 }
 
+nodes <- c("A", "B", "C", "D")
 
 cond_density_HR <- function(dag, data, Gamma, nodes) {
   
@@ -228,11 +242,7 @@ cond_density_HR <- function(dag, data, Gamma, nodes) {
     results_list[[v]] <- list(
       z_scores = z_scores,
       pit_vals = pit_vals,
-      ks_pvalue = ks_p,
-      mu = mu_star,
-      sigma = sd_star,
-      yv = yv,
-      ypa = ypa
+      ks_pvalue = ks_p
     )
   }
   
@@ -242,14 +252,16 @@ cond_density_HR <- function(dag, data, Gamma, nodes) {
 
 results_sim <- cond_density_HR(
   dag   = B_pruned,   
-  data = Y_mp,       
+  data = Y,       
   Gamma = Gamma_hat,   
   nodes = nodes
 )
 
-hist(results_sim[[2]]$pit_vals, breaks = 10,
+hist(results_sim[[3]]$pit_vals, breaks = 10,
      main = paste("PIT histogram for", names(results_sim)[1]),
      xlab = "PIT value", freq = FALSE)
+
+results_sim[[1]]$ks_pvalue
 
 pit_vals1 <- results_sim[[1]]$pit_vals
 qq_df <- data.frame(
@@ -265,5 +277,7 @@ p_qq <- ggplot(qq_df, aes(x = uni_q, y = emp_q)) +
        y = "Empirical Quantiles")
 
 p_qq
+
+
 
 
