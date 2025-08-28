@@ -31,12 +31,12 @@ source(here("analyses","01_load_packages.R"))
 # simulate data function
 #===============================================================================
 
-sample_bulk_SCM <- function(n, B_adj, W, Sigma = diag(nrow(B_adj)),
+sample_bulk_data <- function(n, B_adj, W, Sigma = diag(nrow(B_adj)),
                             noise = c("gaussian", "student")) {
   
   d <- nrow(B_adj)
   
-  # determine causal ordering
+  # determine ordering of nodes
   caus_order <- causalXtreme:::compute_caus_order(B_adj) 
   
   # simulate noise variables
@@ -92,12 +92,12 @@ for (r in 1:n_sim) {
     for (n in n_vals) {
       
       # simulate Gaussian data (correctly specified)
-      X_gauss <- sample_bulk_SCM(n = n, B_adj = B_adj, W = W,
+      X_gauss <- sample_bulk_data(n = n, B_adj = B_adj, W = W,
                                  noise = "gaussian")
       bn_gauss <- tabu(as.data.frame(X_gauss))
       
       # simulate Student-t data (misspecified)
-      X_student <- sample_bulk_SCM(n = n, B_adj = B_adj, W = W,
+      X_student <- sample_bulk_data(n = n, B_adj = B_adj, W = W,
                                    noise = "student")
       bn_student <- tabu(as.data.frame(X_student))
       
