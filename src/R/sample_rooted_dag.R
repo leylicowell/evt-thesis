@@ -60,6 +60,6 @@ generate_Gamma <- function(B, cov_e, k){
   
   Theta <- t((P_k)) %*% Theta_k_tilde %*% (P_k)
   
-  graphicalExtremes::Theta2Gamma(Theta)
+  return(graphicalExtremes::Theta2Gamma(Theta))
   
 }

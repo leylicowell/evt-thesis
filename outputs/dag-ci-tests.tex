@@ -1,0 +1,20 @@
+\begin{table}[!h]
+\centering
+\caption{Tests of implied conditional independencies from the averaged DAG. 
+  The null hypothesis is that the stated conditional independence holds in the data.}
+\centering
+\begin{tabular}[t]{lcc}
+\toprule
+  & p-value & Decision\\
+\midrule
+CZE _||_ DNK | EUR, HUN, SWE & 0.31200 & Do not reject\\
+CZE _||_ NOR | DNK, POL, SWE & 0.01880 & Reject\\
+CZE _||_ NOR | EUR, HUN, POL, SWE & 0.04030 & Reject\\
+DNK _||_ POL | EUR, HUN, SWE & 0.85100 & Do not reject\\
+EUR _||_ NOR | DNK, POL, SWE & 0.32900 & Do not reject\\
+\addlinespace
+EUR _||_ SWE | DNK, HUN & 0.34100 & Do not reject\\
+HUN _||_ NOR | DNK, POL, SWE & 0.00657 & Reject\\
+\bottomrule
+\end{tabular}
+\end{table}
