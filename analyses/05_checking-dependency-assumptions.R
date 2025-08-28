@@ -35,7 +35,7 @@ head(dat)
 #===============================================================================
 
 q_vals<- seq(0.75, 0.99, length.out = 150)
-B <- 20  # number of bootstrap resamples for CI estimation
+B <- 20 
 
 # focus on root node vs other nodes to check that we don't have asymptotic 
 # independence
@@ -95,7 +95,7 @@ asym_dep_test <- function(data, pairs, quantiles, bootstrap_num){
 
 
 # calculate extremal correlation for different quantiles 
-chi_df <- asym_dep_test(dat, pairs, q_vals, B)
+chi_df <- asym_dep_test(dat, pairs, q_vals, 100)
 
 # plot three different quantiles
 q_df <- data.frame(
@@ -104,7 +104,7 @@ q_df <- data.frame(
 )
 
 # plot
-ggplot(chi_df, aes(x = q, y = chi_hat)) +
+p <- ggplot(chi_df, aes(x = q, y = chi_hat)) +
   geom_ribbon(aes(ymin = chi_lower, ymax = chi_upper), 
               alpha = 0.6, 
               fill = "grey") +
@@ -116,9 +116,17 @@ ggplot(chi_df, aes(x = q, y = chi_hat)) +
   labs(x = "Quantile, q",
        y = expression(hat(chi)),
        colour = "Quantiles") +
-  theme_bw()
+  theme_bw() +
+  theme(panel.grid.minor = element_blank(),
+        legend.position = "none",
+        plot.title = element_text(size = 14.5, face = "bold", hjust = 0.5),
+        axis.text = element_text(size = 13),
+        strip.text = element_text(face = "bold", size = 13.5),
+        axis.title = element_text(size = 14))
 
+p
 
+ggsave(here("outputs", "extreme-corr.pdf"), plot = p, width = 10, height = 6)
 
 #-------------------------------------------------------------------------------
 # repeat for 4 random pairings
@@ -145,4 +153,10 @@ ggplot(random_chi_df, aes(x = q, y = chi_hat)) +
   facet_wrap(~ paste0(curr_i, "/", curr_j), scales = "free_y") +
   labs(x = "Quantile, q",
        y = expression(hat(chi))) +
-  theme_bw()
+  theme_bw()+  
+  theme(panel.grid.minor = element_blank(),
+        legend.position = "none",
+        plot.title = element_text(size = 14.5, face = "bold", hjust = 0.5),
+        axis.text = element_text(size = 13),
+        strip.text = element_text(face = "bold", size = 13.5),
+        axis.title = element_text(size = 14))
