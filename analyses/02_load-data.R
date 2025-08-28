@@ -52,7 +52,7 @@ n <-  dim(log_returns)[1]
 
 # garch residuals
 spec <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1,1)),
-                   mean.model = list(armaOrder = c(1,2), include.mean = TRUE),
+                   mean.model = list(armaOrder = c(0,2), include.mean = TRUE),
                    distribution.model = "std")
 
 
